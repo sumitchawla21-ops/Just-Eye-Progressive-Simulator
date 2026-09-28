@@ -20,23 +20,21 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Repair Android project structure
-        shell: bash
+      - name: Restructure Project Files
         run: |
-          set -e
-
           mkdir -p app/src/main/java/com/justeye/progressivesimulator
           mkdir -p app/src/main/res/values
 
-          mv -f MainActivity.kt app/src/main/java/com/justeye/progressivesimulator/MainActivity.kt 2>/dev/null || true
-          mv -f SimulationOverlays.kt app/src/main/java/com/justeye/progressivesimulator/SimulationOverlays.kt 2>/dev/null || true
-          mv -f AndroidManifest.xml app/src/main/AndroidManifest.xml 2>/dev/null || true
-          mv -f strings.xml app/src/main/res/values/strings.xml 2>/dev/null || true
-          mv -f build.gradle app/build.gradle 2>/dev/null || true
+          [ -f MainActivity.kt ] && mv MainActivity.kt app/src/main/java/com/justeye/progressivesimulator/
+          [ -f SimulationOverlays.kt ] && mv SimulationOverlays.kt app/src/main/java/com/justeye/progressivesimulator/
+          [ -f AndroidManifest.xml ] && mv AndroidManifest.xml app/src/main/
+          [ -f strings.xml ] && mv strings.xml app/src/main/res/values/
 
-          # Create root build.gradle if missing
-          if [ ! -f build.gradle ]; then
-            cat << 'EOF' > build.gradle
+          # Create root settings.gradle
+          echo "include ':app'" > settings.gradle
+
+          # Create root build.gradle
+          cat << 'EOF' > build.gradle
           buildscript {
               repositories {
                   google()
@@ -54,20 +52,54 @@ jobs:
               }
           }
           EOF
-          fi
 
-          # Create root settings.gradle if missing
-          if [ ! -f settings.gradle ]; then
-            echo "include ':app'" > settings.gradle
-          fi
+          # Create app/build.gradle
+          cat << 'EOF' > app/build.gradle
+          plugins {
+              id 'com.android.application'
+              id 'org.jetbrains.kotlin.android'
+          }
 
-      - name: Setup Gradle Wrapper & Build APK
+          android {
+              namespace 'com.justeye.progressivesimulator'
+              compileSdk 34
+
+              defaultConfig {
+                  applicationId "com.justeye.progressivesimulator"
+                  minSdk 24
+                  targetSdk 34
+                  versionCode 1
+                  versionName "1.0"
+              }
+
+              buildTypes {
+                  release {
+                      minifyEnabled false
+                  }
+              }
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+              kotlinOptions {
+                  jvmTarget = '17'
+              }
+          }
+
+          dependencies {
+              implementation 'androidx.core:core-ktx:1.12.0'
+              implementation 'androidx.appcompat:appcompat:1.6.1'
+              implementation 'com.google.android.material:material:1.11.0'
+          }
+          EOF
+
+      - name: Build APK with Gradle
         run: |
           gradle wrapper
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      - name: Upload APK Artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Just-Eye-App
