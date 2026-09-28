@@ -18,6 +18,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.compose.ui.platform.LocalContext
+import androidx.camera.view.PreviewView
+import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 
@@ -71,7 +74,7 @@ private fun Header() {
 
 @Composable
 private fun SingleSimulation(design: Int, onDesign: (Int) -> Unit, onCompare: (String) -> Unit) {
-    Box(Modifier.weight(1f).fillMaxWidth()) {
+   Column(modifier = Modifier.fillMaxWidth()) {
         CameraPreview(Modifier.fillMaxSize())
         ProgressiveOverlay(design, Modifier.fillMaxSize())
 
@@ -137,23 +140,26 @@ private fun CompareSimulation(mode: String, onBack: () -> Unit) {
 @Composable
 private fun CameraPreview(modifier: Modifier) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
     AndroidView(
         modifier = modifier,
         factory = { ctx ->
-            PreviewView(ctx).apply {
-                scaleType = PreviewView.ScaleType.FILL_CENTER
-                implementationMode = PreviewView.ImplementationMode.PERFORMANCE
+    PreviewView(ctx).apply {
+        scaleType = PreviewView.ScaleType.FILL_CENTER
+        implementationMode = PreviewView.ImplementationMode.PERFORMANCE
+    }
+}
                 val future = ProcessCameraProvider.getInstance(ctx)
                 future.addListener({
                     val provider = future.get()
-                    val preview = Preview.Builder().build()
-                    preview.surfaceProvider = surfaceProvider
-                    provider.unbindAll()
-                    provider.bindToLifecycle(
-                        lifecycleOwner,
-                        CameraSelector.DEFAULT_BACK_CAMERA,
-                        preview
+val preview = androidx.camera.core.Preview.Builder().build()
+preview.setSurfaceProvider(it.surfaceProvider)
+provider.unbindAll()
+provider.bindToLifecycle(
+    lifecycleOwner,
+    androidx.camera.core.CameraSelector.DEFAULT_BACK_CAMERA,
+    preview
+)
                     )
                 }, ContextCompat.getMainExecutor(ctx))
             }
