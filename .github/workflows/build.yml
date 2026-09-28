@@ -25,7 +25,7 @@ jobs:
           mkdir -p app/src/main/java/com/justeye/progressivesimulator
           mkdir -p app/src/main/res/values
 
-          # Move source files
+          # Move Kotlin source files
           find . -maxdepth 1 -name "*.kt" -exec mv {} app/src/main/java/com/justeye/progressivesimulator/ \;
           [ -f AndroidManifest.xml ] && mv AndroidManifest.xml app/src/main/
           [ -f strings.xml ] && mv strings.xml app/src/main/res/values/
@@ -88,9 +88,13 @@ jobs:
           }
           EOF
 
-      - name: Build APK with Gradle 8.2
+      - name: Generate and Execute Gradle Wrapper
         run: |
+          # Generate local wrapper files
           gradle wrapper --gradle-version 8.2
+          
+          # Force execution through the local wrapper script
+          chmod +x gradlew
           ./gradlew assembleDebug
 
       - name: Upload APK
