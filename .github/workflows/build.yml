@@ -25,7 +25,7 @@ jobs:
         with:
           gradle-version: '8.2'
 
-      - name: Restructure Project Files
+      - name: Restructure Project Files & Generate Resources
         run: |
           mkdir -p app/src/main/java/com/justeye/progressivesimulator
           mkdir -p app/src/main/res/values
@@ -34,6 +34,18 @@ jobs:
           find . -maxdepth 1 -name "*.kt" -exec mv {} app/src/main/java/com/justeye/progressivesimulator/ \;
           [ -f AndroidManifest.xml ] && mv AndroidManifest.xml app/src/main/
           [ -f strings.xml ] && mv strings.xml app/src/main/res/values/
+
+          # Generate themes.xml to define Theme.JustEye
+          cat << 'EOF' > app/src/main/res/values/themes.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="Theme.JustEye" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+                  <item name="colorPrimary">#6200EE</item>
+                  <item name="colorPrimaryVariant">#3700B3</item>
+                  <item name="colorOnPrimary">#FFFFFF</item>
+              </style>
+          </resources>
+          EOF
 
           # Create root settings.gradle
           echo "include ':app'" > settings.gradle
