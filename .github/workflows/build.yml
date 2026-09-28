@@ -25,49 +25,40 @@ jobs:
         with:
           gradle-version: '8.2'
 
-      - name: Restructure Project Files & Patch Code
+      - name: Setup Directory Structure
         run: |
           mkdir -p app/src/main/java/com/justeye/progressivesimulator
           mkdir -p app/src/main/res/values
 
-          # Move Kotlin source files
+          # Move root files if present
           find . -maxdepth 1 -name "*.kt" -exec mv {} app/src/main/java/com/justeye/progressivesimulator/ \;
           [ -f AndroidManifest.xml ] && mv AndroidManifest.xml app/src/main/
           [ -f strings.xml ] && mv strings.xml app/src/main/res/values/
 
-          # Cleanly patch imports using Python to avoid syntax corruption
+          # Ensure essential imports exist without breaking file structure
           python3 -c "
           import os
 
-          # Patch SimulationOverlays.kt
-          sim_path = 'app/src/main/java/com/justeye/progressivesimulator/SimulationOverlays.kt'
-          if os.path.exists(sim_path):
-              with open(sim_path, 'r') as f:
-                  content = f.read()
-              if 'import androidx.compose.ui.graphics.drawscope.Stroke' not in content:
-                  content = 'import androidx.compose.ui.graphics.drawscope.Stroke\n' + content
-              with open(sim_path, 'w') as f:
-                  f.write(content)
+          def ensure_import(file_path, import_stmt):
+              if not os.path.exists(file_path):
+                  return
+              with open(file_path, 'r') as f:
+                  lines = f.readlines()
+              if any(import_stmt in line for line in lines):
+                  return
+              pkg_idx = next((i for i, l in enumerate(lines) if l.startswith('package ')), -1)
+              insert_at = pkg_idx + 1 if pkg_idx != -1 else 0
+              lines.insert(insert_at, import_stmt + '\n')
+              with open(file_path, 'w') as f:
+                  f.writelines(lines)
 
-          # Patch MainActivity.kt
-          main_path = 'app/src/main/java/com/justeye/progressivesimulator/MainActivity.kt'
-          if os.path.exists(main_path):
-              with open(main_path, 'r') as f:
-                  content = f.read()
-              imports = [
-                  'import androidx.compose.ui.Modifier',
-                  'import androidx.camera.view.PreviewView',
-                  'import androidx.camera.lifecycle.ProcessCameraProvider',
-                  'import androidx.compose.ui.platform.LocalContext'
-              ]
-              new_imports = '\n'.join([imp for imp in imports if imp not in content])
-              if new_imports:
-                  content = new_imports + '\n' + content
-              with open(main_path, 'w') as f:
-                  f.write(content)
+          ensure_import('app/src/main/java/com/justeye/progressivesimulator/SimulationOverlays.kt', 'import androidx.compose.ui.graphics.drawscope.Stroke')
+          ensure_import('app/src/main/java/com/justeye/progressivesimulator/MainActivity.kt', 'import androidx.compose.ui.platform.LocalContext')
+          ensure_import('app/src/main/java/com/justeye/progressivesimulator/MainActivity.kt', 'import androidx.camera.view.PreviewView')
+          ensure_import('app/src/main/java/com/justeye/progressivesimulator/MainActivity.kt', 'import androidx.camera.lifecycle.ProcessCameraProvider')
           "
 
-          # Generate themes.xml
+          # Create default theme
           cat << 'EOF' > app/src/main/res/values/themes.xml
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
