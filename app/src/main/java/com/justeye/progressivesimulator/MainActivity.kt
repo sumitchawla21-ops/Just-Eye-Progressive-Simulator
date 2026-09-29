@@ -1,14 +1,11 @@
 package com.justeye.progressivesimulator
 
 import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.Preview
-import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -16,32 +13,48 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.compose.LocalLifecycleOwner
 
 class MainActivity : ComponentActivity() {
 
-    private val cameraPermission =
-        registerForActivityResult(
-            ActivityResultContracts.RequestPermission()
-        ) { }
+    private val cameraPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        setContent {
+            JustEyeApp(cameraPermissionGranted = granted)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        cameraPermission.launch(Manifest.permission.CAMERA)
+        val permissionGranted = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
 
-        setContent {
-            JustEyeApp()
+        if (permissionGranted) {
+            setContent {
+                JustEyeApp(cameraPermissionGranted = true)
+            }
+        } else {
+            setContent {
+                JustEyeApp(cameraPermissionGranted = false)
+            }
+
+            cameraPermission.launch(Manifest.permission.CAMERA)
         }
     }
 }
 
 @Composable
-fun JustEyeApp() {
+fun JustEyeApp(cameraPermissionGranted: Boolean) {
 
     var design by remember { mutableIntStateOf(1) }
     var compare by remember { mutableStateOf<String?>(null) }
@@ -63,20 +76,34 @@ fun JustEyeApp() {
 
                 Header()
 
-                if (compare == null) {
+                if (!cameraPermissionGranted) {
 
-                    SingleSimulation(
-                        design = design,
-                        onDesign = { design = it },
-                        onCompare = { compare = it }
-                    )
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Camera permission is required\nfor the Progressive Vision Simulator.",
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
 
                 } else {
 
-                    CompareSimulation(
-                        mode = compare!!,
-                        onBack = { compare = null }
-                    )
+                    if (compare == null) {
+                        SingleSimulation(
+                            design = design,
+                            onDesign = { design = it },
+                            onCompare = { compare = it }
+                        )
+                    } else {
+                        CompareSimulation(compare!!) {
+                            compare = null
+                        }
+                    }
                 }
             }
         }
@@ -85,7 +112,6 @@ fun JustEyeApp() {
 
 @Composable
 private fun Header() {
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -93,15 +119,14 @@ private fun Header() {
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-
         Text(
-            text = "JUST EYE",
+            "JUST EYE",
             color = Color(0xFFE4B95E),
             style = MaterialTheme.typography.headlineSmall
         )
 
         Text(
-            text = "PROGRESSIVE VISION SIMULATOR",
+            "PROGRESSIVE VISION SIMULATOR",
             color = Color.White,
             style = MaterialTheme.typography.labelMedium
         )
@@ -114,9 +139,10 @@ private fun SingleSimulation(
     onDesign: (Int) -> Unit,
     onCompare: (String) -> Unit
 ) {
-
     Box(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .weight(1f)
+            .fillMaxWidth()
     ) {
 
         CameraPreview(
@@ -124,8 +150,8 @@ private fun SingleSimulation(
         )
 
         ProgressiveOverlay(
-            design = design,
-            modifier = Modifier.fillMaxSize()
+            design,
+            Modifier.fillMaxSize()
         )
 
         Column(
@@ -138,44 +164,37 @@ private fun SingleSimulation(
         ) {
 
             Text(
-                text = when (design) {
-                    1 -> "FRAME 1 â€¢ CONVENTIONAL â€¢ NARROW FOV"
-                    2 -> "FRAME 2 â€¢ IMPROVED â€¢ WIDER FOV"
-                    else -> "FRAME 3 â€¢ ADVANCED â€¢ WIDEST FOV"
+                when (design) {
+                    1 -> "FRAME 1  •  CONVENTIONAL  •  NARROW FOV"
+                    2 -> "FRAME 2  •  IMPROVED  •  WIDER FOV"
+                    else -> "FRAME 3  •  ADVANCED  •  WIDEST FOV"
                 },
                 color = Color.White
             )
 
-            Spacer(
-                modifier = Modifier.height(8.dp)
-            )
+            Spacer(Modifier.height(8.dp))
 
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-
-                (1..3).forEach { number ->
+                (1..3).forEach { n ->
 
                     Button(
-                        onClick = {
-                            onDesign(number)
-                        },
+                        onClick = { onDesign(n) },
                         colors = ButtonDefaults.buttonColors(
                             containerColor =
-                                if (design == number)
+                                if (design == n)
                                     Color(0xFFD7A84A)
                                 else
                                     Color(0xFF252525)
                         )
                     ) {
-                        Text("$number")
+                        Text("$n")
                     }
                 }
             }
 
-            Spacer(
-                modifier = Modifier.height(8.dp)
-            )
+            Spacer(Modifier.height(8.dp))
 
             Row(
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -189,24 +208,18 @@ private fun SingleSimulation(
                 ).forEach { label ->
 
                     OutlinedButton(
-                        onClick = {
-                            onCompare(label)
-                        }
+                        onClick = { onCompare(label) }
                     ) {
                         Text(
-                            text = label,
+                            label,
                             style = MaterialTheme.typography.labelSmall
                         )
                     }
                 }
             }
 
-            Spacer(
-                modifier = Modifier.height(4.dp)
-            )
-
             Text(
-                text = "DEMO ONLY â€” simulated field of view, not a prescription or exact lens performance.",
+                "DEMO ONLY — simulated field of view, not a prescription or exact lens performance.",
                 color = Color(0xFFAAAAAA),
                 style = MaterialTheme.typography.labelSmall
             )
@@ -219,7 +232,6 @@ private fun CompareSimulation(
     mode: String,
     onBack: () -> Unit
 ) {
-
     Box(
         modifier = Modifier.fillMaxSize()
     ) {
@@ -229,8 +241,8 @@ private fun CompareSimulation(
         )
 
         CompareOverlay(
-            mode = mode,
-            modifier = Modifier.fillMaxSize()
+            mode,
+            Modifier.fillMaxSize()
         )
 
         Column(
@@ -243,13 +255,11 @@ private fun CompareSimulation(
         ) {
 
             Text(
-                text = "COMPARE $mode",
+                "COMPARE $mode",
                 color = Color.White
             )
 
-            Spacer(
-                modifier = Modifier.height(8.dp)
-            )
+            Spacer(Modifier.height(8.dp))
 
             Button(
                 onClick = onBack
@@ -261,75 +271,47 @@ private fun CompareSimulation(
 }
 
 @Composable
-private fun CameraPreview(
-    modifier: Modifier
-) {
+private fun CameraPreview(modifier: Modifier) {
 
-    val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-
-    val previewView = remember {
-        PreviewView(context).apply {
-            scaleType = PreviewView.ScaleType.FILL_CENTER
-            implementationMode =
-                PreviewView.ImplementationMode.PERFORMANCE
-        }
-    }
+    val lifecycleOwner =
+        androidx.lifecycle.compose.LocalLifecycleOwner.current
 
     AndroidView(
         modifier = modifier,
-        factory = {
-            previewView
-        }
-    )
 
-    DisposableEffect(
-        lifecycleOwner,
-        previewView
-    ) {
+        factory = { ctx ->
 
-        val cameraProviderFuture =
-            ProcessCameraProvider.getInstance(context)
+            PreviewView(ctx).apply {
 
-        var cameraProvider: ProcessCameraProvider? = null
+                scaleType =
+                    PreviewView.ScaleType.FILL_CENTER
 
-        val executor =
-            ContextCompat.getMainExecutor(context)
+                implementationMode =
+                    PreviewView.ImplementationMode.PERFORMANCE
 
-        val listener = Runnable {
+                val future =
+                    ProcessCameraProvider.getInstance(ctx)
 
-            try {
+                future.addListener({
 
-                cameraProvider =
-                    cameraProviderFuture.get()
+                    val provider = future.get()
 
-                val preview =
-                    Preview.Builder().build()
+                    val preview =
+                        Preview.Builder().build()
 
-                preview.setSurfaceProvider(
-                    previewView.surfaceProvider
-                )
+                    preview.surfaceProvider =
+                        surfaceProvider
 
-                cameraProvider?.unbindAll()
+                    provider.unbindAll()
 
-                cameraProvider?.bindToLifecycle(
-                    lifecycleOwner,
-                    CameraSelector.DEFAULT_BACK_CAMERA,
-                    preview
-                )
+                    provider.bindToLifecycle(
+                        lifecycleOwner,
+                        CameraSelector.DEFAULT_BACK_CAMERA,
+                        preview
+                    )
 
-            } catch (_: Exception) {
+                }, ContextCompat.getMainExecutor(ctx))
             }
         }
-
-        cameraProviderFuture.addListener(
-            listener,
-            executor
-        )
-
-        onDispose {
-
-            cameraProvider?.unbindAll()
-        }
-    }
+    )
 }
