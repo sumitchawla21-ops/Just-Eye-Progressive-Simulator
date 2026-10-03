@@ -134,7 +134,7 @@ private fun Header() {
 }
 
 @Composable
-private fun SingleSimulation(
+private fun ColumnScope.SingleSimulation(
     design: Int,
     onDesign: (Int) -> Unit,
     onCompare: (String) -> Unit
@@ -165,9 +165,9 @@ private fun SingleSimulation(
 
             Text(
                 when (design) {
-                    1 -> "FRAME 1  •  CONVENTIONAL  •  NARROW FOV"
-                    2 -> "FRAME 2  •  IMPROVED  •  WIDER FOV"
-                    else -> "FRAME 3  •  ADVANCED  •  WIDEST FOV"
+                    1 -> "FRAME 1  â€¢  CONVENTIONAL  â€¢  NARROW FOV"
+                    2 -> "FRAME 2  â€¢  IMPROVED  â€¢  WIDER FOV"
+                    else -> "FRAME 3  â€¢  ADVANCED  â€¢  WIDEST FOV"
                 },
                 color = Color.White
             )
@@ -219,7 +219,7 @@ private fun SingleSimulation(
             }
 
             Text(
-                "DEMO ONLY — simulated field of view, not a prescription or exact lens performance.",
+                "DEMO ONLY â€” simulated field of view, not a prescription or exact lens performance.",
                 color = Color(0xFFAAAAAA),
                 style = MaterialTheme.typography.labelSmall
             )
