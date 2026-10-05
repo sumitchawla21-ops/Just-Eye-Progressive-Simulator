@@ -1,5 +1,8 @@
 package com.justeye.progressivesimulator
 
+import android.os.Build
+import android.graphics.RenderEffect
+import android.graphics.RuntimeShader
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -249,6 +252,7 @@ private fun SingleSimulation(
     ) {
 
         CameraPreview(
+            mode = design.toString(),
             modifier = Modifier.fillMaxSize()
         )
 
@@ -360,6 +364,7 @@ private fun CompareSimulation(
     ) {
 
         CameraPreview(
+            mode = mode,
             modifier = Modifier.fillMaxSize()
         )
 
@@ -400,7 +405,9 @@ private fun CompareSimulation(
 
 
 @Composable
+@Composable
 private fun CameraPreview(
+    mode: String,
     modifier: Modifier
 ) {
 
@@ -420,7 +427,29 @@ private fun CameraPreview(
                     PreviewView.ScaleType.FILL_CENTER
 
                 implementationMode =
-                    PreviewView.ImplementationMode.PERFORMANCE
+                    PreviewView.ImplementationMode.COMPATIBLE
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    addOnLayoutChangeListener { _, left, top, right, bottom,
+                                 oldLeft, oldTop, oldRight, oldBottom ->
+
+        if (
+            right > left &&
+            bottom > top &&
+            (
+                right - left != oldRight - oldLeft ||
+                bottom - top != oldBottom - oldTop
+            )
+        ) {
+            setRenderEffect(
+                createProgressiveBlurEffect(
+                    mode,
+                    (right - left).toFloat(),
+                    (bottom - top).toFloat()
+                )
+            )
+        }
+    }
+}
             }
         },
 
@@ -459,4 +488,306 @@ private fun CameraPreview(
             }, ContextCompat.getMainExecutor(context))
         }
     )
+    private fun createProgressiveBlurEffect(
+    mode: String,
+    width: Float,
+    height: Float
+): RenderEffect? {
+
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+        return null
+    }
+
+    val shaderSource = """
+        uniform shader composable;
+
+        uniform float2 resolution;
+
+        uniform float clearWidth1;
+        uniform float clearWidth2;
+        uniform float clearWidth3;
+
+        uniform float panelCount;
+
+        half4 blurPixel(float2 coord) {
+
+            float2 d = float2(10.0, 10.0);
+
+            half4 c0 = composable.eval(coord);
+            half4 c1 = composable.eval(coord + float2(d.x, 0.0));
+            half4 c2 = composable.eval(coord - float2(d.x, 0.0));
+            half4 c3 = composable.eval(coord + float2(0.0, d.y));
+            half4 c4 = composable.eval(coord - float2(0.0, d.y));
+            half4 c5 = composable.eval(coord + d);
+            half4 c6 = composable.eval(coord - d);
+            half4 c7 = composable.eval(coord + float2(d.x, -d.y));
+            half4 c8 = composable.eval(coord + float2(-d.x, d.y));
+
+            return
+                (c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8)
+                / 9.0;
+        }
+
+        half4 processPanel(
+            float2 coord,
+            float panelLeft,
+            float panelRight,
+            float clearHalfWidth
+        ) {
+
+            float panelWidth = panelRight - panelLeft;
+
+            float x =
+                (coord.x - panelLeft) / panelWidth;
+
+            float y =
+                coord.y / resolution.y;
+
+            float curve =
+                0.035 * pow(
+                    abs(y - 0.52) * 1.8,
+                    2.0
+                );
+
+            float leftBoundary =
+                0.5 - clearHalfWidth + curve;
+
+            float rightBoundary =
+                0.5 + clearHalfWidth - curve;
+
+            float signedDistance =
+                min(
+                    x - leftBoundary,
+                    rightBoundary - x
+                );
+
+            float sharpAmount =
+                smoothstep(
+                    -0.03,
+                    0.03,
+                    signedDistance
+                );
+
+            half4 blurred =
+                blurPixel(coord);
+
+            half4 sharp =
+                composable.eval(coord);
+
+            return mix(
+                blurred,
+                sharp,
+                sharpAmount
+            );
+        }
+
+        half4 main(float2 coord) {
+
+            if (panelCount < 1.5) {
+
+                float clearWidth = clearWidth1;
+
+                if (clearWidth2 > 0.0) {
+                    clearWidth = clearWidth2;
+                }
+
+                if (clearWidth3 > 0.0) {
+                    clearWidth = clearWidth3;
+                }
+
+                return processPanel(
+                    coord,
+                    0.0,
+                    resolution.x,
+                    clearWidth
+                );
+            }
+
+            if (panelCount < 2.5) {
+
+                if (coord.x < resolution.x * 0.5) {
+
+                    return processPanel(
+                        coord,
+                        0.0,
+                        resolution.x * 0.5,
+                        clearWidth1
+                    );
+
+                } else {
+
+                    return processPanel(
+                        coord,
+                        resolution.x * 0.5,
+                        resolution.x,
+                        clearWidth2
+                    );
+                }
+            }
+
+            float third =
+                resolution.x / 3.0;
+
+            if (coord.x < third) {
+
+                return processPanel(
+                    coord,
+                    0.0,
+                    third,
+                    clearWidth1
+                );
+
+            } else if (coord.x < third * 2.0) {
+
+                return processPanel(
+                    coord,
+                    third,
+                    third * 2.0,
+                    clearWidth2
+                );
+
+            } else {
+
+                return processPanel(
+                    coord,
+                    third * 2.0,
+                    resolution.x,
+                    clearWidth3
+                );
+            }
+        }
+    """.trimIndent()
+
+    val shader =
+        RuntimeShader(shaderSource)
+
+    shader.setFloatUniform(
+        "resolution",
+        width,
+        height
+    )
+
+    shader.setFloatUniform(
+        "clearWidth1",
+        0.20f
+    )
+
+    shader.setFloatUniform(
+        "clearWidth2",
+        0.28f
+    )
+
+    shader.setFloatUniform(
+        "clearWidth3",
+        0.35f
+    )
+
+    when (mode) {
+
+        "1" -> {
+            shader.setFloatUniform(
+                "panelCount",
+                1.0f
+            )
+            shader.setFloatUniform(
+                "clearWidth2",
+                0.0f
+            )
+            shader.setFloatUniform(
+                "clearWidth3",
+                0.0f
+            )
+        }
+
+        "2" -> {
+            shader.setFloatUniform(
+                "panelCount",
+                1.0f
+            )
+            shader.setFloatUniform(
+                "clearWidth1",
+                0.0f
+            )
+            shader.setFloatUniform(
+                "clearWidth3",
+                0.0f
+            )
+        }
+
+        "3" -> {
+            shader.setFloatUniform(
+                "panelCount",
+                1.0f
+            )
+            shader.setFloatUniform(
+                "clearWidth1",
+                0.0f
+            )
+            shader.setFloatUniform(
+                "clearWidth2",
+                0.0f
+            )
+        }
+
+        "1 vs 2" -> {
+            shader.setFloatUniform(
+                "panelCount",
+                2.0f
+            )
+        }
+
+        "1 vs 3" -> {
+            shader.setFloatUniform(
+                "panelCount",
+                2.0f
+            )
+            shader.setFloatUniform(
+                "clearWidth2",
+                0.35f
+            )
+        }
+
+        "2 vs 3" -> {
+            shader.setFloatUniform(
+                "panelCount",
+                2.0f
+            )
+            shader.setFloatUniform(
+                "clearWidth1",
+                0.28f
+            )
+            shader.setFloatUniform(
+                "clearWidth2",
+                0.35f
+            )
+        }
+
+        "1 vs 2 vs 3" -> {
+            shader.setFloatUniform(
+                "panelCount",
+                3.0f
+            )
+        }
+
+        else -> {
+            shader.setFloatUniform(
+                "panelCount",
+                1.0f
+            )
+            shader.setFloatUniform(
+                "clearWidth2",
+                0.0f
+            )
+            shader.setFloatUniform(
+                "clearWidth3",
+                0.0f
+            )
+        }
+    }
+
+    return RenderEffect.createRuntimeShaderEffect(
+        shader,
+        "composable"
+    )
+}
 }
