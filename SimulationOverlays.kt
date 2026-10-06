@@ -4,134 +4,37 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.Stroke
-
-/*
- * Visual simulator overlay for progressive-lens usable-field zones.
- *
- * Design 1 = narrowest corridor
- * Design 2 = medium corridor
- * Design 3 = widest corridor
- *
- * This is an educational visual simulation and not an optical calculation.
- */
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.unit.dp
+import kotlin.math.abs
 
 @Composable
 fun ProgressiveOverlay(
     design: Int,
     modifier: Modifier = Modifier
 ) {
-    val widths = when (design) {
-        1 -> floatArrayOf(0.48f, 0.30f, 0.44f)
-        2 -> floatArrayOf(0.62f, 0.40f, 0.58f)
-        else -> floatArrayOf(0.76f, 0.52f, 0.72f)
-    }
-
-    val darkness = when (design) {
-        1 -> 0.42f
-        2 -> 0.34f
-        else -> 0.26f
+    val clearHalfWidth = when (design) {
+        1 -> 0.20f
+        2 -> 0.28f
+        else -> 0.35f
     }
 
     Canvas(modifier = modifier) {
 
-        val w = size.width
-        val h = size.height
-
-        val topY = h * 0.10f
-        val midY = h * 0.50f
-        val bottomY = h * 0.90f
-
-        val centerX = w / 2f
-
-        val topHalf = w * widths[0] / 2f
-        val midHalf = w * widths[1] / 2f
-        val bottomHalf = w * widths[2] / 2f
-
-        val topLeft = centerX - topHalf
-        val topRight = centerX + topHalf
-
-        val midLeft = centerX - midHalf
-        val midRight = centerX + midHalf
-
-        val bottomLeft = centerX - bottomHalf
-        val bottomRight = centerX + bottomHalf
-
-        val shade = Color.Black.copy(alpha = darkness)
-
-        // TOP peripheral area
-        drawRect(
-            color = shade,
-            topLeft = Offset(0f, 0f),
-            size = Size(w, topY)
-        )
-
-        // LEFT peripheral area
-        val leftPath = Path().apply {
-            moveTo(0f, topY)
-            lineTo(topLeft, topY)
-            lineTo(midLeft, midY)
-            lineTo(bottomLeft, bottomY)
-            lineTo(0f, bottomY)
-            close()
-        }
-
-        drawPath(
-            path = leftPath,
-            color = shade
-        )
-
-        // RIGHT peripheral area
-        val rightPath = Path().apply {
-            moveTo(topRight, topY)
-            lineTo(w, topY)
-            lineTo(w, bottomY)
-            lineTo(bottomRight, bottomY)
-            lineTo(midRight, midY)
-            close()
-        }
-
-        drawPath(
-            path = rightPath,
-            color = shade
-        )
-
-        // BOTTOM peripheral area
-        drawRect(
-            color = shade,
-            topLeft = Offset(0f, bottomY),
-            size = Size(w, h - bottomY)
-        )
-
-        // Golden boundary around the usable corridor
-        val corridorPath = Path().apply {
-            moveTo(topLeft, topY)
-            lineTo(midLeft, midY)
-            lineTo(bottomLeft, bottomY)
-            lineTo(bottomRight, bottomY)
-            lineTo(midRight, midY)
-            lineTo(topRight, topY)
-            close()
-        }
-
-        drawPath(
-            path = corridorPath,
-            color = Color(0xFFD7A84A).copy(alpha = 0.30f),
-            style = Stroke(width = 2f)
+        drawProgressivePanel(
+            left = 0f,
+            right = size.width,
+            clearHalfWidth = clearHalfWidth,
+            height = size.height
         )
     }
 }
 
-
-/*
- * Side-by-side comparison overlay.
- *
- * Left side  = narrower usable field
- * Right side = wider usable field
- */
 @Composable
 fun CompareOverlay(
     mode: String,
@@ -139,133 +42,222 @@ fun CompareOverlay(
 ) {
     Canvas(modifier = modifier) {
 
-        val w = size.width
-        val h = size.height
-        val center = w / 2f
+        when (mode) {
 
-        val leftWidth =
-            if (mode.contains("1")) 0.30f else 0.42f
+            "1 vs 2" -> {
 
-        val rightWidth =
-            if (mode.contains("3")) 0.72f else 0.55f
+                drawProgressivePanel(
+                    left = 0f,
+                    right = size.width / 2f,
+                    clearHalfWidth = 0.20f,
+                    height = size.height
+                )
 
-        val shade = Color.Black.copy(alpha = 0.45f)
+                drawProgressivePanel(
+                    left = size.width / 2f,
+                    right = size.width,
+                    clearHalfWidth = 0.28f,
+                    height = size.height
+                )
 
-        drawComparisonZone(
-            x0 = 0f,
-            x1 = center,
-            h = h,
-            widthFactor = leftWidth,
-            shade = shade
-        )
+                drawLine(
+                    color = Color.White.copy(alpha = 0.55f),
+                    start = Offset(size.width / 2f, 0f),
+                    end = Offset(size.width / 2f, size.height),
+                    strokeWidth = 1.dp.toPx()
+                )
+            }
 
-        drawComparisonZone(
-            x0 = center,
-            x1 = w,
-            h = h,
-            widthFactor = rightWidth,
-            shade = shade
-        )
+            "1 vs 3" -> {
 
-        // Center divider
-        drawLine(
-            color = Color(0xFFD7A84A),
-            start = Offset(center, 0f),
-            end = Offset(center, h),
-            strokeWidth = 2f
-        )
+                drawProgressivePanel(
+                    left = 0f,
+                    right = size.width / 2f,
+                    clearHalfWidth = 0.20f,
+                    height = size.height
+                )
+
+                drawProgressivePanel(
+                    left = size.width / 2f,
+                    right = size.width,
+                    clearHalfWidth = 0.35f,
+                    height = size.height
+                )
+
+                drawLine(
+                    color = Color.White.copy(alpha = 0.55f),
+                    start = Offset(size.width / 2f, 0f),
+                    end = Offset(size.width / 2f, size.height),
+                    strokeWidth = 1.dp.toPx()
+                )
+            }
+
+            "2 vs 3" -> {
+
+                drawProgressivePanel(
+                    left = 0f,
+                    right = size.width / 2f,
+                    clearHalfWidth = 0.28f,
+                    height = size.height
+                )
+
+                drawProgressivePanel(
+                    left = size.width / 2f,
+                    right = size.width,
+                    clearHalfWidth = 0.35f,
+                    height = size.height
+                )
+
+                drawLine(
+                    color = Color.White.copy(alpha = 0.55f),
+                    start = Offset(size.width / 2f, 0f),
+                    end = Offset(size.width / 2f, size.height),
+                    strokeWidth = 1.dp.toPx()
+                )
+            }
+
+            "1 vs 2 vs 3" -> {
+
+                val third = size.width / 3f
+
+                drawProgressivePanel(
+                    left = 0f,
+                    right = third,
+                    clearHalfWidth = 0.20f,
+                    height = size.height
+                )
+
+                drawProgressivePanel(
+                    left = third,
+                    right = third * 2f,
+                    clearHalfWidth = 0.28f,
+                    height = size.height
+                )
+
+                drawProgressivePanel(
+                    left = third * 2f,
+                    right = size.width,
+                    clearHalfWidth = 0.35f,
+                    height = size.height
+                )
+
+                drawLine(
+                    color = Color.White.copy(alpha = 0.55f),
+                    start = Offset(third, 0f),
+                    end = Offset(third, size.height),
+                    strokeWidth = 1.dp.toPx()
+                )
+
+                drawLine(
+                    color = Color.White.copy(alpha = 0.55f),
+                    start = Offset(third * 2f, 0f),
+                    end = Offset(third * 2f, size.height),
+                    strokeWidth = 1.dp.toPx()
+                )
+            }
+        }
     }
 }
 
-
-/*
- * Draws the peripheral shaded areas for one side of the comparison.
- */
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawComparisonZone(
-    x0: Float,
-    x1: Float,
-    h: Float,
-    widthFactor: Float,
-    shade: Color
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawProgressivePanel(
+    left: Float,
+    right: Float,
+    clearHalfWidth: Float,
+    height: Float
 ) {
-    val fullWidth = x1 - x0
-    val center = (x0 + x1) / 2f
 
-    val topY = h * 0.08f
-    val midY = h * 0.52f
-    val bottomY = h * 0.92f
+    val panelWidth = right - left
+    val center = (left + right) / 2f
 
-    val topHalf = fullWidth * widthFactor / 2f
-    val midHalf = fullWidth * widthFactor * 0.62f / 2f
-    val bottomHalf = fullWidth * widthFactor * 0.88f / 2f
+    val leftBoundary = center - panelWidth * clearHalfWidth
+    val rightBoundary = center + panelWidth * clearHalfWidth
 
-    val topLeft = center - topHalf
-    val topRight = center + topHalf
-
-    val midLeft = center - midHalf
-    val midRight = center + midHalf
-
-    val bottomLeft = center - bottomHalf
-    val bottomRight = center + bottomHalf
-
-    // Top
-    drawRect(
-        color = shade,
-        topLeft = Offset(x0, 0f),
-        size = Size(fullWidth, topY)
+    val dottedEffect = PathEffect.dashPathEffect(
+        floatArrayOf(
+            14.dp.toPx(),
+            10.dp.toPx()
+        ),
+        0f
     )
 
-    // Left
-    val leftPath = Path().apply {
-        moveTo(x0, topY)
-        lineTo(topLeft, topY)
-        lineTo(midLeft, midY)
-        lineTo(bottomLeft, bottomY)
-        lineTo(x0, bottomY)
-        close()
+    val boundaryStroke = Stroke(
+        width = 2.dp.toPx(),
+        pathEffect = dottedEffect,
+        cap = StrokeCap.Round,
+        join = StrokeJoin.Round
+    )
+
+    val boundaryColor = Color.White.copy(alpha = 0.90f)
+
+    val leftPath = Path()
+
+    for (i in 0..40) {
+
+        val t = i / 40f
+        val y = height * t
+
+        val curve =
+            panelWidth *
+                0.035f *
+                ((abs(t - 0.52f) * 1.8f) *
+                    (abs(t - 0.52f) * 1.8f))
+
+        val x = leftBoundary + curve
+
+        if (i == 0) {
+            leftPath.moveTo(x, y)
+        } else {
+            leftPath.lineTo(x, y)
+        }
+    }
+
+    val rightPath = Path()
+
+    for (i in 0..40) {
+
+        val t = i / 40f
+        val y = height * t
+
+        val curve =
+            panelWidth *
+                0.035f *
+                ((abs(t - 0.52f) * 1.8f) *
+                    (abs(t - 0.52f) * 1.8f))
+
+        val x = rightBoundary - curve
+
+        if (i == 0) {
+            rightPath.moveTo(x, y)
+        } else {
+            rightPath.lineTo(x, y)
+        }
     }
 
     drawPath(
         path = leftPath,
-        color = shade
+        color = boundaryColor,
+        style = boundaryStroke
     )
-
-    // Right
-    val rightPath = Path().apply {
-        moveTo(topRight, topY)
-        lineTo(x1, topY)
-        lineTo(x1, bottomY)
-        lineTo(bottomRight, bottomY)
-        lineTo(midRight, midY)
-        close()
-    }
 
     drawPath(
         path = rightPath,
-        color = shade
+        color = boundaryColor,
+        style = boundaryStroke
     )
 
-    // Bottom
-    drawRect(
-        color = shade,
-        topLeft = Offset(x0, bottomY),
-        size = Size(fullWidth, h - bottomY)
-    )
+    val indicatorY = height * 0.52f
 
-    // Golden corridor outline
-    val corridorPath = Path().apply {
-        moveTo(topLeft, topY)
-        lineTo(midLeft, midY)
-        lineTo(bottomLeft, bottomY)
-        lineTo(bottomRight, bottomY)
-        lineTo(midRight, midY)
-        lineTo(topRight, topY)
-        close()
-    }
-
-    drawPath(
-        path = corridorPath,
-        color = Color(0xFFD7A84A).copy(alpha = 0.25f),
-        style = Stroke(width = 2f)
+    drawLine(
+        color = Color.White.copy(alpha = 0.90f),
+        start = Offset(
+            leftBoundary,
+            indicatorY
+        ),
+        end = Offset(
+            rightBoundary,
+            indicatorY
+        ),
+        strokeWidth = 2.dp.toPx(),
+        cap = StrokeCap.Round
     )
 }
