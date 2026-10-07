@@ -432,14 +432,7 @@ private fun CameraPreview(
     addOnLayoutChangeListener { _, left, top, right, bottom,
                                  oldLeft, oldTop, oldRight, oldBottom ->
 
-        if (
-            right > left &&
-            bottom > top &&
-            (
-                right - left != oldRight - oldLeft ||
-                bottom - top != oldBottom - oldTop
-            )
-        ) {
+       if (right > left && bottom > top) {
             setRenderEffect(
                 createProgressiveBlurEffect(
                     mode,
