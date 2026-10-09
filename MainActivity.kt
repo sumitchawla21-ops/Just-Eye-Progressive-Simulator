@@ -554,12 +554,22 @@ private fun CameraPreview(
                     rightBoundary - x
                 );
 
-            float sharpAmount =
-                smoothstep(
-                    -0.03,
-                    0.03,
-                    signedDistance
-                );
+            float horizontalSharp =
+    smoothstep(
+        -0.03,
+        0.03,
+        signedDistance
+    );
+
+float topClear =
+    1.0 - smoothstep(
+        0.18,
+        0.28,
+        y
+    );
+
+float sharpAmount =
+    max(horizontalSharp, topClear);
 
             half4 blurred =
                 blurPixel(coord);
