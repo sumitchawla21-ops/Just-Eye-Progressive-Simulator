@@ -71,10 +71,10 @@ class MainActivity : ComponentActivity() {
         }
 
         if (!cameraGranted) {
-            cameraPermission.launch(
-                Manifest.permission.CAMERA
-            )
-        }
+    cameraPermission.launch(
+        Manifest.permission.CAMERA
+    )
+}
     }
 }
 
