@@ -433,11 +433,11 @@ private fun CameraPreview(
                                  oldLeft, oldTop, oldRight, oldBottom ->
 
        if (right > left && bottom > top) {
-           setRenderEffect(
-    RenderEffect.createBlurEffect(
-        25f,
-        25f,
-        android.graphics.Shader.TileMode.CLAMP
+         setRenderEffect(
+    createProgressiveBlurEffect(
+        mode = mode,
+        width = (right - left).toFloat(),
+        height = (bottom - top).toFloat()
     )
 )
         }
