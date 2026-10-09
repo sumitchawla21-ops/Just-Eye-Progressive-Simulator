@@ -504,7 +504,7 @@ private fun CameraPreview(
 
         half4 blurPixel(float2 coord) {
 
-            float2 d = float2(25.0, 25.0);
+            float2 d = float2(40.0, 40.0);
 
             half4 c0 = composable.eval(coord);
             half4 c1 = composable.eval(coord + float2(d.x, 0.0));
