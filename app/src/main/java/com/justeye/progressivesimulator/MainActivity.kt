@@ -3,10 +3,22 @@ package com.justeye.progressivesimulator
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.graphics.Bitmap
+import android.util.Size
+import android.os.SystemClock
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.drawWithContent
+import androidx.compose.ui.draw.clipPath
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.ClipOp
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -16,6 +28,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -139,6 +153,14 @@ private fun ColumnScope.SingleSimulation(
     onDesign: (Int) -> Unit,
     onCompare: (String) -> Unit
 ) {
+    var blurredFrame by remember { mutableStateOf<Bitmap?>(null) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            blurredFrame?.recycle()
+        }
+    }
+
     Box(
         modifier = Modifier
             .weight(1f)
@@ -146,12 +168,20 @@ private fun ColumnScope.SingleSimulation(
     ) {
 
         CameraPreview(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
+            onBlurFrame = { frame ->
+                val previous = blurredFrame
+                blurredFrame = frame
+                if (previous != null && previous !== frame && !previous.isRecycled) {
+                    previous.recycle()
+                }
+            }
         )
 
-        ProgressiveOverlay(
-            design,
-            Modifier.fillMaxSize()
+        PeripheralBlurLayer(
+            bitmap = blurredFrame,
+            design = design,
+            modifier = Modifier.fillMaxSize()
         )
 
         Column(
@@ -271,46 +301,102 @@ private fun CompareSimulation(
 }
 
 @Composable
-private fun CameraPreview(modifier: Modifier) {
+private fun CameraPreview(
+    modifier: Modifier,
+    onBlurFrame: ((Bitmap) -> Unit)? = null
+) {
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
 
-    val lifecycleOwner =
-        androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(analysisExecutor) {
+        onDispose { analysisExecutor.shutdown() }
+    }
 
     AndroidView(
         modifier = modifier,
-
         factory = { ctx ->
-
             PreviewView(ctx).apply {
+                scaleType = PreviewView.ScaleType.FILL_CENTER
+                implementationMode = PreviewView.ImplementationMode.PERFORMANCE
 
-                scaleType =
-                    PreviewView.ScaleType.FILL_CENTER
-
-                implementationMode =
-                    PreviewView.ImplementationMode.PERFORMANCE
-
-                val future =
-                    ProcessCameraProvider.getInstance(ctx)
-
+                val future = ProcessCameraProvider.getInstance(ctx)
                 future.addListener({
-
                     val provider = future.get()
+                    val preview = Preview.Builder().build().also {
+                        it.surfaceProvider = surfaceProvider
+                    }
 
-                    val preview =
-                        Preview.Builder().build()
-
-                    preview.surfaceProvider =
-                        surfaceProvider
+                    val analysis = if (onBlurFrame != null) {
+                        ImageAnalysis.Builder()
+                            .setTargetResolution(Size(640, 480))
+                            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                            .build().also { useCase ->
+                                val frameCounter = AtomicInteger(0)
+                                useCase.setAnalyzer(analysisExecutor) { image: ImageProxy ->
+                                    if (frameCounter.incrementAndGet() % 4 != 0) {
+                                        image.close()
+                                    } else {
+                                        image.toPeripheralBlurBitmap()?.let(onBlurFrame)
+                                    }
+                                }
+                            }
+                    } else null
 
                     provider.unbindAll()
-
-                    provider.bindToLifecycle(
-                        lifecycleOwner,
-                        CameraSelector.DEFAULT_BACK_CAMERA,
-                        preview
-                    )
-
+                    if (analysis != null) {
+                        provider.bindToLifecycle(
+                            lifecycleOwner,
+                            CameraSelector.DEFAULT_BACK_CAMERA,
+                            preview,
+                            analysis
+                        )
+                    } else {
+                        provider.bindToLifecycle(
+                            lifecycleOwner,
+                            CameraSelector.DEFAULT_BACK_CAMERA,
+                            preview
+                        )
+                    }
                 }, ContextCompat.getMainExecutor(ctx))
+            }
+        }
+    )
+}
+
+@Composable
+private fun PeripheralBlurLayer(
+    bitmap: Bitmap?,
+    design: Int,
+    modifier: Modifier = Modifier
+) {
+    if (bitmap == null || bitmap.isRecycled) return
+
+    val corridorFraction = when (design) {
+        1 -> 0.36f
+        2 -> 0.50f
+        else -> 0.64f
+    }
+
+    Image(
+        bitmap = bitmap.asImageBitmap(),
+        contentDescription = "Simulated peripheral blur",
+        contentScale = ContentScale.Crop,
+        modifier = modifier.drawWithContent {
+            val w = size.width
+            val h = size.height
+            val topClearY = h * 0.20f
+            val halfCorridorAtBottom = w * corridorFraction / 2f
+            val corridor = Path().apply {
+                moveTo(0f, 0f)
+                lineTo(w, 0f)
+                lineTo(w, topClearY)
+                lineTo(w / 2f + halfCorridorAtBottom, h)
+                lineTo(w / 2f - halfCorridorAtBottom, h)
+                lineTo(0f, topClearY)
+                close()
+            }
+            clipPath(corridor, ClipOp.Difference) {
+                this@drawWithContent.drawContent()
             }
         }
     )
