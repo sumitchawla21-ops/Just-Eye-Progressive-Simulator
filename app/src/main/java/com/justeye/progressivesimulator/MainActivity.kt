@@ -389,21 +389,21 @@ private fun PeripheralBlurLayer(
             val rightBottom = centerX + halfCorridorAtBottom
             val leftBottom = centerX - halfCorridorAtBottom
 
-            // Keep the upper field clear, then curve the corridor edges
-            // inward smoothly instead of using straight trapezoid sides.
+            // Keep the upper field clear. Start each curved edge vertically
+            // so the transition from the top field into the corridor is smooth.
             val corridor = Path().apply {
                 moveTo(0f, 0f)
                 lineTo(w, 0f)
                 lineTo(w, topClearY)
                 cubicTo(
-                    w * 0.86f, h * 0.43f,
-                    centerX + halfCorridorAtBottom * 1.30f, h * 0.78f,
+                    w, topClearY + h * 0.16f,
+                    centerX + halfCorridorAtBottom * 1.22f, h * 0.76f,
                     rightBottom, h
                 )
                 lineTo(leftBottom, h)
                 cubicTo(
-                    centerX - halfCorridorAtBottom * 1.30f, h * 0.78f,
-                    w * 0.14f, h * 0.43f,
+                    centerX - halfCorridorAtBottom * 1.22f, h * 0.76f,
+                    0f, topClearY + h * 0.16f,
                     0f, topClearY
                 )
                 close()
