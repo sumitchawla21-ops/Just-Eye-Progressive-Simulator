@@ -73,7 +73,7 @@ fun ImageProxy.toPeripheralBlurBitmap(): Bitmap? {
         val small = Bitmap.createScaledBitmap(upright, smallWidth, smallHeight, true)
         if (small !== upright) upright.recycle()
 
-        val softened = boxBlur(small, radius = 7)
+        val softened = boxBlur(small, radius = 14)
         if (softened !== small) small.recycle()
 
         Bitmap.createScaledBitmap(softened, max(1, imageWidthAfterRotation(softened, rotation, imageWidth, imageHeight)), max(1, imageHeightAfterRotation(softened, rotation, imageWidth, imageHeight)), true)
