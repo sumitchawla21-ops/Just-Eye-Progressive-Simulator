@@ -385,13 +385,27 @@ private fun PeripheralBlurLayer(
             val h = size.height
             val topClearY = h * 0.20f
             val halfCorridorAtBottom = w * corridorFraction / 2f
+            val centerX = w / 2f
+            val rightBottom = centerX + halfCorridorAtBottom
+            val leftBottom = centerX - halfCorridorAtBottom
+
+            // Keep the upper field clear, then curve the corridor edges
+            // inward smoothly instead of using straight trapezoid sides.
             val corridor = Path().apply {
                 moveTo(0f, 0f)
                 lineTo(w, 0f)
                 lineTo(w, topClearY)
-                lineTo(w / 2f + halfCorridorAtBottom, h)
-                lineTo(w / 2f - halfCorridorAtBottom, h)
-                lineTo(0f, topClearY)
+                cubicTo(
+                    w * 0.86f, h * 0.43f,
+                    centerX + halfCorridorAtBottom * 1.30f, h * 0.78f,
+                    rightBottom, h
+                )
+                lineTo(leftBottom, h)
+                cubicTo(
+                    centerX - halfCorridorAtBottom * 1.30f, h * 0.78f,
+                    w * 0.14f, h * 0.43f,
+                    0f, topClearY
+                )
                 close()
             }
             clipPath(corridor, ClipOp.Difference) {
