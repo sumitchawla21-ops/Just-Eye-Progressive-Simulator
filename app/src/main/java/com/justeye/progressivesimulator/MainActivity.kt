@@ -5,7 +5,6 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.graphics.Bitmap
 import android.util.Size
-import android.os.SystemClock
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 import androidx.activity.ComponentActivity
@@ -14,7 +13,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.drawWithContent
-import androidx.compose.ui.draw.clipPath
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.asImageBitmap
