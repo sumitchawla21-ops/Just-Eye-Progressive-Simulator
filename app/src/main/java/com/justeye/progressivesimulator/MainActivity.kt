@@ -378,9 +378,9 @@ private fun PeripheralBlurLayer(
     }
 
     val imageBitmap = bitmap.asImageBitmap()
-    val featherSteps = 8
-    val maximumFeather = 0.12f
-    val layerAlpha = 0.18f
+    val featherSteps = 24
+    val maximumFeather = 0.16f
+    val layerAlpha = 0.08f
 
     // Draw the blurred image in several softly overlapping layers.
     // Wider masks are drawn first; progressively narrower masks fill in
