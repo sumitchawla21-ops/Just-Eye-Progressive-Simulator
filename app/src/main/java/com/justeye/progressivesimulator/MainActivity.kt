@@ -15,10 +15,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.Preview
-import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 
 class MainActivity : ComponentActivity() {
@@ -146,12 +142,8 @@ private fun ColumnScope.SingleSimulation(
     ) {
 
         CameraPreview(
+            design = design,
             modifier = Modifier.fillMaxSize()
-        )
-
-        ProgressiveOverlay(
-            design,
-            Modifier.fillMaxSize()
         )
 
         Column(
@@ -237,6 +229,7 @@ private fun CompareSimulation(
     ) {
 
         CameraPreview(
+            design = 2,
             modifier = Modifier.fillMaxSize()
         )
 
@@ -271,47 +264,22 @@ private fun CompareSimulation(
 }
 
 @Composable
-private fun CameraPreview(modifier: Modifier) {
-
+private fun CameraPreview(
+    design: Int,
+    modifier: Modifier
+) {
     val lifecycleOwner =
         androidx.lifecycle.compose.LocalLifecycleOwner.current
 
     AndroidView(
         modifier = modifier,
-
         factory = { ctx ->
-
-            PreviewView(ctx).apply {
-
-                scaleType =
-                    PreviewView.ScaleType.FILL_CENTER
-
-                implementationMode =
-                    PreviewView.ImplementationMode.PERFORMANCE
-
-                val future =
-                    ProcessCameraProvider.getInstance(ctx)
-
-                future.addListener({
-
-                    val provider = future.get()
-
-                    val preview =
-                        Preview.Builder().build()
-
-                    preview.surfaceProvider =
-                        surfaceProvider
-
-                    provider.unbindAll()
-
-                    provider.bindToLifecycle(
-                        lifecycleOwner,
-                        CameraSelector.DEFAULT_BACK_CAMERA,
-                        preview
-                    )
-
-                }, ContextCompat.getMainExecutor(ctx))
+            ProgressiveGlView(ctx, lifecycleOwner).apply {
+                setDesign(design)
             }
+        },
+        update = { view ->
+            view.setDesign(design)
         }
     )
 }
