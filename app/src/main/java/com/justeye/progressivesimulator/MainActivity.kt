@@ -16,6 +16,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.ClipOp
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.layout.*
@@ -376,41 +377,57 @@ private fun PeripheralBlurLayer(
         else -> 0.64f
     }
 
-    Image(
-        bitmap = bitmap.asImageBitmap(),
-        contentDescription = "Simulated peripheral blur",
-        contentScale = ContentScale.Crop,
-        modifier = modifier.drawWithContent {
-            val w = size.width
-            val h = size.height
-            val topClearY = h * 0.20f
-            val halfCorridorAtBottom = w * corridorFraction / 2f
-            val centerX = w / 2f
-            val rightBottom = centerX + halfCorridorAtBottom
-            val leftBottom = centerX - halfCorridorAtBottom
+    val imageBitmap = bitmap.asImageBitmap()
+    val featherSteps = 8
+    val maximumFeather = 0.12f
+    val layerAlpha = 0.18f
 
-            // Keep the upper field clear. Start each curved edge vertically
-            // so the transition from the top field into the corridor is smooth.
-            val corridor = Path().apply {
-                moveTo(0f, 0f)
-                lineTo(w, 0f)
-                lineTo(w, topClearY)
-                cubicTo(
-                    w, topClearY + h * 0.16f,
-                    centerX + halfCorridorAtBottom * 1.22f, h * 0.76f,
-                    rightBottom, h
-                )
-                lineTo(leftBottom, h)
-                cubicTo(
-                    centerX - halfCorridorAtBottom * 1.22f, h * 0.76f,
-                    0f, topClearY + h * 0.16f,
-                    0f, topClearY
-                )
-                close()
-            }
-            clipPath(corridor, ClipOp.Difference) {
-                this@drawWithContent.drawContent()
-            }
-        }
-    )
+    // Draw the blurred image in several softly overlapping layers.
+    // Wider masks are drawn first; progressively narrower masks fill in
+    // the outer field while creating a gentler transition at the corridor.
+    for (step in 0 until featherSteps) {
+        val progress = step.toFloat() / (featherSteps - 1).toFloat()
+        val extraWidth = maximumFeather * (1f - progress)
+
+        Image(
+            bitmap = imageBitmap,
+            contentDescription = if (step == 0) "Simulated peripheral blur" else null,
+            contentScale = ContentScale.Crop,
+            modifier = modifier
+                .graphicsLayer { alpha = layerAlpha }
+                .drawWithContent {
+                    val w = size.width
+                    val h = size.height
+                    val topClearY = h * 0.20f
+                    val expandedFraction =
+                        (corridorFraction + extraWidth).coerceAtMost(0.92f)
+                    val halfCorridorAtBottom = w * expandedFraction / 2f
+                    val centerX = w / 2f
+                    val rightBottom = centerX + halfCorridorAtBottom
+                    val leftBottom = centerX - halfCorridorAtBottom
+
+                    val corridor = Path().apply {
+                        moveTo(0f, 0f)
+                        lineTo(w, 0f)
+                        lineTo(w, topClearY)
+                        cubicTo(
+                            w, topClearY + h * 0.16f,
+                            centerX + halfCorridorAtBottom * 1.22f, h * 0.76f,
+                            rightBottom, h
+                        )
+                        lineTo(leftBottom, h)
+                        cubicTo(
+                            centerX - halfCorridorAtBottom * 1.22f, h * 0.76f,
+                            0f, topClearY + h * 0.16f,
+                            0f, topClearY
+                        )
+                        close()
+                    }
+
+                    clipPath(corridor, ClipOp.Difference) {
+                        this@drawWithContent.drawContent()
+                    }
+                }
+        )
+    }
 }
